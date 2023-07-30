@@ -961,7 +961,7 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 					{
 						// SRS - take window border into account when when saving window position cvars
 						int topBorder, leftBorder, bottomBorder, rightBorder;
-						SDL_Window* window = SDL_GetWindowFromID( ev.window.windowID );
+						SDL_Window* window = SDL_GetWindowFromID( event->window.windowID );
 						SDL_GetWindowBordersSize( window, &topBorder, &leftBorder, &bottomBorder, &rightBorder );
 						r_windowX.SetInteger( x - leftBorder );
 						r_windowY.SetInteger( y - topBorder );
