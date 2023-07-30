@@ -4,7 +4,7 @@
 Doom 3 GPL Source Code
 Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
 Copyright (C) 2012 dhewg (dhewm3)
-Copyright (C) 2012 Robert Beckebans
+Copyright (C) 2012-2014 Robert Beckebans
 Copyright (C) 2013 Daniel Gibson
 
 This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
@@ -53,7 +53,7 @@ idCVar r_waylandcompat( "r_waylandcompat", "0", CVAR_SYSTEM | CVAR_NOCHEAT | CVA
 idCVar r_useOpenGL32( "r_useOpenGL32", "1", CVAR_INTEGER, "0 = OpenGL 2.0, 1 = OpenGL 3.2 compatibility profile, 2 = OpenGL 3.2 core profile", 0, 2 );
 // RB end
 
-static bool grabbed = true;
+static bool grabbed = false;
 
 static SDL_Window* window = NULL;
 static SDL_GLContext context = NULL;
@@ -75,10 +75,24 @@ void GLimp_PreInit() // DG: added this function for SDL compatibility
 	if( !SDL_WasInit( SDL_INIT_VIDEO ) )
 	{
 		if( SDL_Init( SDL_INIT_VIDEO ) )
+		{
 			common->Error( "Error while initializing SDL: %s", SDL_GetError() );
+		}
 	}
 }
 
+// SRS - Function to get display frequency of monitor hosting the current window
+static int GetDisplayFrequency( glimpParms_t parms )
+{
+	SDL_DisplayMode m = {0};
+	if( SDL_GetWindowDisplayMode( window, &m ) < 0 )
+	{
+		common->Warning( "Couldn't get display refresh rate, reason: %s", SDL_GetError() );
+		return parms.displayHz;
+	}
+
+	return m.refresh_rate;
+}
 
 /*
 ===================
@@ -96,8 +110,10 @@ bool GLimp_Init( glimpParms_t parms )
 	// DG end
 	
 	if( parms.fullScreen )
+	{
 		flags |= SDL_WINDOW_FULLSCREEN;
-		
+	}
+
 #if SDL_VERSION_ATLEAST(2, 0, 1)
 	// raynorpat: take advantage of HighDPI displays
 	flags |= SDL_WINDOW_ALLOW_HIGHDPI;
@@ -120,18 +136,28 @@ bool GLimp_Init( glimpParms_t parms )
 			{
 				case 2 :
 					if( colorbits == 24 )
+					{
 						colorbits = 16;
+					}
 					break;
 				case 1 :
 					if( depthbits == 24 )
+					{
 						depthbits = 16;
+					}
 					else if( depthbits == 16 )
+					{
 						depthbits = 8;
+					}
 				case 3 :
 					if( stencilbits == 24 )
+					{
 						stencilbits = 16;
+					}
 					else if( stencilbits == 16 )
+					{
 						stencilbits = 8;
+					}
 			}
 		}
 		
@@ -143,32 +169,46 @@ bool GLimp_Init( glimpParms_t parms )
 		{
 			// reduce colorbits
 			if( tcolorbits == 24 )
+			{
 				tcolorbits = 16;
+			}
 		}
 		
 		if( ( i % 4 ) == 2 )
 		{
 			// reduce depthbits
 			if( tdepthbits == 24 )
+			{
 				tdepthbits = 16;
+			}
 			else if( tdepthbits == 16 )
+			{
 				tdepthbits = 8;
+			}
 		}
 		
 		if( ( i % 4 ) == 1 )
 		{
 			// reduce stencilbits
 			if( tstencilbits == 24 )
+			{
 				tstencilbits = 16;
+			}
 			else if( tstencilbits == 16 )
+			{
 				tstencilbits = 8;
+			}
 			else
+			{
 				tstencilbits = 0;
+			}
 		}
-		
+
 		int channelcolorbits = 4;
 		if( tcolorbits == 24 )
+		{
 			channelcolorbits = 8;
+		}
 			
 		SDL_GL_SetAttribute( SDL_GL_RED_SIZE, channelcolorbits );
 		SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, channelcolorbits );
@@ -178,9 +218,13 @@ bool GLimp_Init( glimpParms_t parms )
 		SDL_GL_SetAttribute( SDL_GL_STENCIL_SIZE, tstencilbits );
 		
 		if( r_waylandcompat.GetBool() )
+		{
 			SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 0 );
+		}
 		else
+		{
 			SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, channelcolorbits );
+		}
 			
 		SDL_GL_SetAttribute( SDL_GL_STEREO, parms.stereo ? 1 : 0 );
 		
@@ -233,6 +277,7 @@ bool GLimp_Init( glimpParms_t parms )
 								   windowPos,
 								   parms.width, parms.height, flags );
 		// DG end
+
 		context = SDL_GL_CreateContext( window );
 		
 		if( !window )
@@ -241,9 +286,24 @@ bool GLimp_Init( glimpParms_t parms )
 							 channelcolorbits, tdepthbits, tstencilbits, SDL_GetError() );
 			continue;
 		}
-		
+
+		// SRS - Make sure display is set to requested refresh rate from the start
+		if( parms.displayHz > 0 && parms.displayHz != GetDisplayFrequency( parms ) )
+		{
+			SDL_DisplayMode m = {0};
+			SDL_GetWindowDisplayMode( window, &m );
+
+			m.refresh_rate = parms.displayHz;
+			if( SDL_SetWindowDisplayMode( window, &m ) < 0 )
+			{
+				common->Warning( "Couldn't set display refresh rate to %i Hz", parms.displayHz );
+			}
+		}
+
 		if( SDL_GL_SetSwapInterval( r_swapInterval.GetInteger() ) < 0 )
+		{
 			common->Warning( "SDL_GL_SWAP_CONTROL not supported" );
+		}
 			
 		// RB begin
 		SDL_GetWindowSize( window, &glConfig.nativeScreenWidth, &glConfig.nativeScreenHeight );
@@ -258,7 +318,7 @@ bool GLimp_Init( glimpParms_t parms )
 		glConfig.stencilBits = tstencilbits;
 		
 		// RB begin
-		glConfig.displayFrequency = 60;
+		glConfig.displayFrequency = GetDisplayFrequency( parms );
 		glConfig.isStereoPixelFormat = parms.stereo;
 		glConfig.multisamples = parms.multiSamples;
 		
@@ -268,7 +328,6 @@ bool GLimp_Init( glimpParms_t parms )
 		// RB end
 		
 		break;
-
 	}
 	
 	if( !window )
@@ -277,22 +336,25 @@ bool GLimp_Init( glimpParms_t parms )
 		return false;
 	}
 	
-	QGL_Init( "nodriverlib" );
+#if defined(__APPLE__) && SDL_VERSION_ATLEAST(2, 0, 2)
+	// SRS - On OSX enable SDL2 relative mouse mode warping to capture mouse properly if outside of window
+	SDL_SetHintWithPriority( SDL_HINT_MOUSE_RELATIVE_MODE_WARP, "1", SDL_HINT_OVERRIDE );
+#endif	
 	
+	QGL_Init( "nodriverlib" );
+
 	// DG: disable cursor, we have two cursors in menu (because mouse isn't grabbed in menu)
 	SDL_ShowCursor( SDL_DISABLE );
 	// DG end
 	
 	return true;
 }
+
 /*
 ===================
  Helper functions for GLimp_SetScreenParms()
 ===================
 */
-
-// SDL1 doesn't support multiple displays, so the source is much shorter and doesn't need seperate functions
-// makes sure the window will be full-screened on the right display and returns the SDL display index
 static int ScreenParmsHandleDisplayIndex( glimpParms_t parms )
 {
 	int displayIdx;
@@ -304,7 +366,9 @@ static int ScreenParmsHandleDisplayIndex( glimpParms_t parms )
 	{
 		displayIdx = SDL_GetWindowDisplayIndex( window );
 		if( displayIdx < 0 ) // for some reason the display for the window couldn't be detected
+		{
 			displayIdx = 0;
+		}
 	}
 	
 	if( parms.fullScreen > SDL_GetNumVideoDisplays() )
@@ -336,28 +400,39 @@ static bool SetScreenParmsFullscreen( glimpParms_t parms )
 	SDL_DisplayMode m = {0};
 	int displayIdx = ScreenParmsHandleDisplayIndex( parms );
 	if( displayIdx < 0 )
+	{
 		return false;
+	}
 		
 	// get current mode of display the window should be full-screened on
 	SDL_GetCurrentDisplayMode( displayIdx, &m );
 	
 	// change settings in that display mode according to parms
 	// FIXME: check if refreshrate, width and height are supported?
-	// m.refresh_rate = parms.displayHz;
-	m.w = parms.width;
-	m.h = parms.height;
-	
-	// set that displaymode
-	if( SDL_SetWindowDisplayMode( window, &m ) < 0 )
+	if( m.w != parms.width || m.h != parms.height || m.refresh_rate != parms.displayHz )
 	{
-		common->Warning( "Couldn't set window mode for fullscreen, reason: %s", SDL_GetError() );
-		return false;
+		m.w = parms.width;
+		m.h = parms.height;
+		m.refresh_rate = parms.displayHz;
+
+		// if we're already in fullscreen mode, disable it first so resizing works properly
+		if( glConfig.isFullscreen )
+		{
+			SDL_SetWindowFullscreen( window, SDL_FALSE );
+		}
+	
+		// set the new displaymode
+		if( SDL_SetWindowDisplayMode( window, &m ) < 0 )
+		{
+			common->Warning( "Couldn't set window mode for fullscreen, reason: %s", SDL_GetError() );
+			return false;
+		}
 	}
 	
 	// if we're currently not in fullscreen mode, we need to switch to fullscreen
 	if( !( SDL_GetWindowFlags( window ) & SDL_WINDOW_FULLSCREEN ) )
 	{
-		if( SDL_SetWindowFullscreen( window, SDL_TRUE ) < 0 )
+		if( SDL_SetWindowFullscreen( window, SDL_WINDOW_FULLSCREEN ) < 0 )
 		{
 			common->Warning( "Couldn't switch to fullscreen mode, reason: %s!", SDL_GetError() );
 			return false;
@@ -368,8 +443,10 @@ static bool SetScreenParmsFullscreen( glimpParms_t parms )
 
 static bool SetScreenParmsWindowed( glimpParms_t parms )
 {
-	SDL_SetWindowSize( window, parms.width, parms.height );
+	// SRS - handle differences in WM behaviour: for macOS set position first, for linux set it last
+#if defined(__APPLE__)
 	SDL_SetWindowPosition( window, parms.x, parms.y );
+#endif
 	
 	// if we're currently in fullscreen mode, we need to disable that
 	if( SDL_GetWindowFlags( window ) & SDL_WINDOW_FULLSCREEN )
@@ -380,6 +457,19 @@ static bool SetScreenParmsWindowed( glimpParms_t parms )
 			return false;
 		}
 	}
+
+	// if window is maximized, restore it to normal before setting size
+	if( SDL_GetWindowFlags( window ) & SDL_WINDOW_MAXIMIZED )
+	{
+		SDL_RestoreWindow( window );
+	}
+
+	SDL_SetWindowSize( window, parms.width, parms.height );
+
+#if !defined(__APPLE__)
+	SDL_SetWindowPosition( window, parms.x, parms.y );
+#endif
+
 	return true;
 }
 
@@ -393,12 +483,16 @@ bool GLimp_SetScreenParms( glimpParms_t parms )
 	if( parms.fullScreen > 0 || parms.fullScreen == -2 )
 	{
 		if( !SetScreenParmsFullscreen( parms ) )
+		{
 			return false;
+		}
 	}
 	else if( parms.fullScreen == 0 ) // windowed mode
 	{
 		if( !SetScreenParmsWindowed( parms ) )
+		{
 			return false;
+		}
 	}
 	else
 	{
@@ -416,7 +510,7 @@ bool GLimp_SetScreenParms( glimpParms_t parms )
 	glConfig.isStereoPixelFormat = parms.stereo;
 	glConfig.nativeScreenWidth = parms.width;
 	glConfig.nativeScreenHeight = parms.height;
-	glConfig.displayFrequency = parms.displayHz;
+	glConfig.displayFrequency = GetDisplayFrequency( parms );
 	glConfig.multisamples = parms.multiSamples;
 	
 	return true;
@@ -490,13 +584,19 @@ void GLimp_GrabInput( int flags )
 	bool grab = flags & GRAB_ENABLE;
 	
 	if( grab && ( flags & GRAB_REENABLE ) )
+	{
 		grab = false;
+	}
 		
 	if( flags & GRAB_SETSTATE )
+	{
 		grabbed = grab;
+	}
 		
 	if( in_nograb.GetBool() )
+	{
 		grab = false;
+	}
 		
 	if( !window )
 	{
@@ -520,8 +620,6 @@ void DumpAllDisplayDevices()
 {
 	common->DPrintf( "TODO: DumpAllDisplayDevices\n" );
 }
-
-
 
 class idSort_VidMode : public idSort_Quick< vidMode_t, idSort_VidMode >
 {
@@ -572,6 +670,9 @@ bool R_GetModeListForDisplay( const int requestedDisplayNum, idList<vidMode_t>& 
 	assert( requestedDisplayNum >= 0 );
 	
 	modeList.Clear();
+
+	bool	verbose = false;
+
 	// DG: SDL2 implementation
 	if( requestedDisplayNum >= SDL_GetNumVideoDisplays() )
 	{
@@ -592,6 +693,29 @@ bool R_GetModeListForDisplay( const int requestedDisplayNum, idList<vidMode_t>& 
 				continue;
 			}
 			
+			if( SDL_BITSPERPIXEL( m.format ) != 32 && SDL_BITSPERPIXEL( m.format ) != 24 )
+			{
+				continue;
+			}
+			if( ( m.refresh_rate != 60 ) && ( m.refresh_rate != 120 ) &&
+					( m.refresh_rate != 144 ) && ( m.refresh_rate != 165 ) && ( m.refresh_rate != 240 ) )
+			{
+				continue;
+			}
+			if( m.h < 720 )
+			{
+				continue;
+			}
+			if( verbose )
+			{
+				common->Printf( "          -------------------\n" );
+				common->Printf( "          modeNum             : %i\n", i );
+				common->Printf( "          dmBitsPerPel        : %i\n", SDL_BITSPERPIXEL( m.format ) );
+				common->Printf( "          dmPelsWidth         : %i\n", m.w );
+				common->Printf( "          dmPelsHeight        : %i\n", m.h );
+				common->Printf( "          dmDisplayFrequency  : %i\n", m.refresh_rate );
+			}
+
 			vidMode_t mode;
 			mode.width = m.w;
 			mode.height = m.h;

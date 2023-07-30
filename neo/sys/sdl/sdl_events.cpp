@@ -855,13 +855,12 @@ void Sys_GrabMouseCursor( bool grabIt )
 	{
 		flags = GRAB_SETSTATE;
 	}
-	
+
 	GLimp_GrabInput( flags );
 }
 
 /*
 ================
-
 Sys_GetEvent
 ================
 */
@@ -910,7 +909,9 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 					SDL_Keymod currentmod = SDL_GetModState();
 					int newmod = KMOD_NONE;
 					if( currentmod & KMOD_CAPS ) // preserve capslock
+					{
 						newmod |= KMOD_CAPS;
+					}
 						
 					SDL_SetModState( ( SDL_Keymod )newmod );
 					
@@ -927,13 +928,23 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 					// DG end
 					break;
 					
+					case SDL_WINDOWEVENT_LEAVE:
+						// mouse has left the window
+						res.evType = SE_MOUSE_LEAVE;
+						return res;
+
 					// DG: handle resizing and moving of window
 				case SDL_WINDOWEVENT_RESIZED:
 				{
 					int w = event->window.data1;
 					int h = event->window.data2;
-					r_windowWidth.SetInteger( w );
-					r_windowHeight.SetInteger( h );
+
+					// SRS - Only save window resized events when in windowed modes
+					if( !renderSystem->IsFullScreen() )
+					{
+						r_windowWidth.SetInteger( w );
+						r_windowHeight.SetInteger( h );
+					}
 					
 					glConfig.nativeScreenWidth = w;
 					glConfig.nativeScreenHeight = h;
@@ -944,8 +955,17 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 				{
 					int x = event->window.data1;
 					int y = event->window.data2;
-					r_windowX.SetInteger( x );
-					r_windowY.SetInteger( y );
+
+					// SRS - Only save window moved events when in windowed modes
+					if( !renderSystem->IsFullScreen() )
+					{
+						// SRS - take window border into account when when saving window position cvars
+						int topBorder, leftBorder, bottomBorder, rightBorder;
+						SDL_Window* window = SDL_GetWindowFromID( ev.window.windowID );
+						SDL_GetWindowBordersSize( window, &topBorder, &leftBorder, &bottomBorder, &rightBorder );
+						r_windowX.SetInteger( x - leftBorder );
+						r_windowY.SetInteger( y - topBorder );
+					}
 					break;
 				}
 				// DG end
@@ -956,7 +976,7 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 		case SDL_KEYDOWN:
 			if( event->key.keysym.sym == SDLK_RETURN && ( event->key.keysym.mod & KMOD_ALT ) > 0 )
 			{
-				// DG: go to fullscreen on current display, instead of always first display
+					/* DG: go to fullscreen on current display, instead of always first display
 				int fullscreen = 0;
 				if( ! renderSystem->IsFullScreen() )
 				{
@@ -965,9 +985,12 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 					fullscreen = -2;
 				}
 				cvarSystem->SetCVarInteger( "r_fullscreen", fullscreen );
-				// DG end
+				// DG end */
+				// SRS - Until Borderless Fullscreen is implemented properly, use same implementation as on Windows
+				cvarSystem->SetCVarBool( "r_fullscreen", !renderSystem->IsFullScreen() );
+				// SRS end
 				PushConsoleEvent( "vid_restart" );
-				return 0;
+				continue; // handle next event
 			}
 			
 			// DG: ctrl-g to un-grab mouse - yeah, left ctrl shoots, then just use right ctrl :)
@@ -976,7 +999,7 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 				bool grab = cvarSystem->GetCVarBool( "in_nograb" );
 				grab = !grab;
 				cvarSystem->SetCVarBool( "in_nograb", grab );
-				return 0;
+				continue; // handle next event
 			}
 			// DG end
 			
@@ -1202,7 +1225,9 @@ void Sys_GenerateEvents()
 	char* s = Posix_ConsoleInput();
 	
 	if( s )
+	{
 		PushConsoleEvent( s );
+	}
 		
 	SDL_PumpEvents();
 }
@@ -1225,7 +1250,9 @@ Sys_ReturnKeyboardInputEvent
 int Sys_ReturnKeyboardInputEvent( const int n, int& key, bool& state )
 {
 	if( n >= kbd_polls.Num() )
+	{
 		return 0;
+	}
 		
 	key = kbd_polls[n].key;
 	state = kbd_polls[n].state;
