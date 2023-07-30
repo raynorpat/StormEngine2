@@ -8,11 +8,13 @@ option(USE_MFC_TOOLS
 		
 option(MONOLITH
 		"Embed game logic into main executable" ON)
-		
-option(OPENAL# Include the libs subdirectory. This will allow the compiler to simplify the include process.
+
+option(OPENAL 
 		"Use OpenAL soft instead of XAudio2" OFF)
+
 option(FORCE_WIN7_COMPAT # This will force the headers to play nice for pre-Windows 8 builds.
 		"Force Windows 7 compatibility." OFF)
+
 if(UNIX)
 	set(OPENAL TRUE)
 endif()
@@ -36,7 +38,7 @@ else()
 	message(STATUS CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE})
 endif()
 
-if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
+if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
 	add_definitions(-pipe)
 	#add_definitions(-Wall)
 	add_definitions(-mmmx -msse -msse2)
@@ -49,10 +51,6 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
 		include_directories(libs/mingw-hacks)
 		include_directories(${DirectX_INCLUDE_DIR})
 		add_definitions(-DUSE_XINPUT)
-	elseif(UNIX)
-		if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND NOT CMAKE_C_COMPILER_ID STREQUAL "Clang")
-			# add_definitions(-mfpmath=387) # sets x87 fpu as generic fpu by default.
-		endif()
 	endif()	
 	
 	#if(NOT ANDROID)
@@ -62,10 +60,18 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
 	# the warnings are used for every profile anyway, so put them in a variable
 	set(my_warn_flags "-Wno-pragmas -Wno-unused-variable -Wno-unused-but-set-variable -Wno-switch -Wno-unused-value -Winvalid-pch")
 	
-	if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+	if(CMAKE_C_COMPILER_ID MATCHES "Clang")
 		# append clang-specific settings for warnings (the second one make sure clang doesn't complain
 		# about unknown -W flags, like -Wno-unused-but-set-variable)
 		set(my_warn_flags "${my_warn_flags} -Wno-local-type-template-args -Wno-unknown-warning-option")
+	endif()
+
+	# Make sure macOS can find system headers and add support for minimum macOS runtime version
+	if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+		add_definitions(-fasm-blocks -isysroot "${CMAKE_OSX_SYSROOT}")
+		if("${CMAKE_OSX_DEPLOYMENT_TARGET}")
+			add_definitions(-mmacosx-version-min="${CMAKE_OSX_DEPLOYMENT_TARGET}")
+		endif()
 	endif()
 	
 	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D_DEBUG -O0 -ggdb -fno-strict-aliasing ${my_warn_flags}")
