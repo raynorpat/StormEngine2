@@ -931,7 +931,7 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 					case SDL_WINDOWEVENT_LEAVE:
 						// mouse has left the window
 						res.evType = SE_MOUSE_LEAVE;
-						return res;
+						break;
 
 					// DG: handle resizing and moving of window
 				case SDL_WINDOWEVENT_RESIZED:
@@ -990,7 +990,7 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 				cvarSystem->SetCVarBool( "r_fullscreen", !renderSystem->IsFullScreen() );
 				// SRS end
 				PushConsoleEvent( "vid_restart" );
-				continue; // handle next event
+				break; // handle next event
 			}
 			
 			// DG: ctrl-g to un-grab mouse - yeah, left ctrl shoots, then just use right ctrl :)
@@ -999,7 +999,7 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 				bool grab = cvarSystem->GetCVarBool( "in_nograb" );
 				grab = !grab;
 				cvarSystem->SetCVarBool( "in_nograb", grab );
-				continue; // handle next event
+				break; // handle next event
 			}
 			// DG end
 			
