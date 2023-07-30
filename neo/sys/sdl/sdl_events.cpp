@@ -933,11 +933,16 @@ int sys_HandleSDL_Events(void *userdata, SDL_Event *event)
 						res.evType = SE_MOUSE_LEAVE;
 						break;
 
-					// DG: handle resizing and moving of window
-				case SDL_WINDOWEVENT_RESIZED:
+				// DG: handle resizing and moving of window
+				case SDL_WINDOWEVENT_SIZE_CHANGED:
 				{
-					int w = event->window.data1;
-					int h = event->window.data2;
+					int w, h;
+					SDL_Window* window = SDL_GetWindowFromID( event->window.windowID );
+#if SDL_VERSION_ATLEAST(2,0,1)
+					SDL_GL_GetDrawableSize( window, &w, &h );	// get the proper physical size of the window
+#else
+					SDL_GetWindowSize( window, &w, &h );
+#endif
 
 					// SRS - Only save window resized events when in windowed modes
 					if( !renderSystem->IsFullScreen() )

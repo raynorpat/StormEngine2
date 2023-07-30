@@ -116,7 +116,7 @@ bool GLimp_Init( glimpParms_t parms )
 
 #if SDL_VERSION_ATLEAST(2, 0, 1)
 	// raynorpat: take advantage of HighDPI displays
-	flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+	//flags |= SDL_WINDOW_ALLOW_HIGHDPI;
 #endif
 
 	int colorbits = 24;
@@ -306,7 +306,11 @@ bool GLimp_Init( glimpParms_t parms )
 		}
 			
 		// RB begin
+#if SDL_VERSION_ATLEAST(2,0,1)
+		SDL_GL_GetDrawableSize( window, &glConfig.nativeScreenWidth, &glConfig.nativeScreenHeight );
+#else
 		SDL_GetWindowSize( window, &glConfig.nativeScreenWidth, &glConfig.nativeScreenHeight );
+#endif
 		// RB end
 		
 		glConfig.isFullscreen = ( SDL_GetWindowFlags( window ) & SDL_WINDOW_FULLSCREEN ) == SDL_WINDOW_FULLSCREEN;
