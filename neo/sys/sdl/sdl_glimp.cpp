@@ -116,7 +116,7 @@ bool GLimp_Init( glimpParms_t parms )
 
 #if SDL_VERSION_ATLEAST(2, 0, 1)
 	// raynorpat: take advantage of HighDPI displays
-	//flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+	flags |= SDL_WINDOW_ALLOW_HIGHDPI;
 #endif
 
 	int colorbits = 24;
